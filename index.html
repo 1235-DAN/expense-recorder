@@ -4,6 +4,13 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>記帳本 - 收支管理</title>
+    <!-- PWA -->
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#b07d3a">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="記帳本">
+    <link rel="apple-touch-icon" href="icon192.png">
     <link href="https://fonts.googleapis.com/css2?family=Crimson+Pro:wght@300;600&family=Noto+Sans+TC:wght@400;700&display=swap" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
     <style>
@@ -1892,7 +1899,7 @@ window.closeEditModal = closeEditModal;
 async function callGemini(prompt) {
     const key = getApiKey();
     if (!key) { showToast('請先設定 Gemini API Key！','error'); return null; return null; }
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${key}`;
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${key}`;
     const res = await fetch(url, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -2055,6 +2062,11 @@ window.addEventListener('DOMContentLoaded', function() {
         showToast('支出已新增！', 'success');
     });
 
+
+    // Service Worker 註冊
+    if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.register('./sw.js').catch(()=>{});
+    }
 
     // ── Firestore 即時監聽：現金記錄 ──
     onSnapshot(query(collection(db, "records"), orderBy("date", "desc")), (snapshot) => {
