@@ -1410,12 +1410,14 @@ function resetBudget() {
 }
 function resetBillDay() {
     localStorage.removeItem('creditBillDay');
+    localStorage.removeItem('creditBillDayUsed');
     document.getElementById('billDayInput').value = '';
     document.getElementById('billDayInput').placeholder = '每月幾號';
     updateBillingDisplay();
 }
 function resetPayDay() {
     localStorage.removeItem('creditPayDay');
+    localStorage.removeItem('creditPayDayUsed');
     document.getElementById('payDayInput').value = '';
     document.getElementById('payDayInput').placeholder = '每月幾號';
     updateBillingDisplay();
@@ -1431,6 +1433,7 @@ function saveBillDay() {
     const val = parseInt(document.getElementById('billDayInput').value);
     if (isNaN(val)||val<1||val>31) { showToast('請輸入 1–31 的日期','error'); return; }
     localStorage.setItem('creditBillDay', val);
+    localStorage.removeItem('creditBillDayUsed'); // 重新計時
     document.getElementById('billDayInput').value = '';
     updateBillingDisplay();
 }
@@ -1438,6 +1441,7 @@ function savePayDay() {
     const val = parseInt(document.getElementById('payDayInput').value);
     if (isNaN(val)||val<1||val>31) { showToast('請輸入 1–31 的日期','error'); return; }
     localStorage.setItem('creditPayDay', val);
+    localStorage.removeItem('creditPayDayUsed');
     document.getElementById('payDayInput').value = '';
     updateBillingDisplay();
 }
@@ -1448,6 +1452,29 @@ function daysUntil(targetDay) {
     const target = thisMonth > now ? thisMonth : nextMonth;
     return Math.ceil((target - now) / (1000*60*60*24));
 }
+// 檢查今天是否已經「過了」設定的那一天（含當天）；若是則自動清空設定
+function checkAndResetDay(storageKey, usedKey, day) {
+    const now = new Date();
+    const todayStr = now.toISOString().split('T')[0];
+    const targetThisMonth = new Date(now.getFullYear(), now.getMonth(), day);
+    const isTargetDayOrPast = now >= new Date(targetThisMonth.getFullYear(), targetThisMonth.getMonth(), targetThisMonth.getDate());
+
+    if (isTargetDayOrPast) {
+        const usedDate = localStorage.getItem(usedKey);
+        if (usedDate !== todayStr) {
+            // 標記今天已觸發過提醒，但下次重新整理（過了今天）才真正清空
+            if (!usedDate) {
+                localStorage.setItem(usedKey, todayStr);
+            } else if (usedDate !== todayStr) {
+                // 已經是隔天了 → 清空設定
+                localStorage.removeItem(storageKey);
+                localStorage.removeItem(usedKey);
+                return true; // 已重置
+            }
+        }
+    }
+    return false;
+}
 function updateBillingDisplay() {
     const billDay = parseInt(localStorage.getItem('creditBillDay') || '0');
     const payDay = parseInt(localStorage.getItem('creditPayDay') || '0');
@@ -1455,21 +1482,41 @@ function updateBillingDisplay() {
     const billCount = document.getElementById('billDayCountdown');
     const payDisp = document.getElementById('payDayDisplay');
     const payCount = document.getElementById('payDayCountdown');
+
+    let billDayActive = billDay, payDayActive = payDay;
+
     if (billDay) {
-        billDisp.textContent = `每月 ${billDay} 號`;
-        const d = daysUntil(billDay);
+        if (checkAndResetDay('creditBillDay', 'creditBillDayUsed', billDay)) {
+            billDayActive = 0;
+            document.getElementById('billDayInput').placeholder = '每月幾號';
+            showToast('信用卡帳單日已重置，請設定下個月日期', 'info');
+        }
+    }
+    if (payDay) {
+        if (checkAndResetDay('creditPayDay', 'creditPayDayUsed', payDay)) {
+            payDayActive = 0;
+            document.getElementById('payDayInput').placeholder = '每月幾號';
+            showToast('信用卡繳費日已重置，請設定下個月日期', 'info');
+        }
+    }
+
+    if (billDayActive) {
+        billDisp.textContent = `每月 ${billDayActive} 號`;
+        const d = daysUntil(billDayActive);
         billCount.textContent = d === 0 ? '⚠️ 今天是帳單日！' : `還有 ${d} 天`;
         billCount.className = 'bb-sub' + (d <= 3 ? ' urgent' : '');
     } else { billDisp.textContent = '未設定'; billCount.textContent = ''; }
-    if (payDay) {
-        payDisp.textContent = `每月 ${payDay} 號`;
-        const d = daysUntil(payDay);
+
+    if (payDayActive) {
+        payDisp.textContent = `每月 ${payDayActive} 號`;
+        const d = daysUntil(payDayActive);
         payCount.textContent = d === 0 ? '⚠️ 今天是繳費日！' : `還有 ${d} 天`;
         payCount.className = 'bb-sub' + (d <= 3 ? ' urgent' : '');
     } else { payDisp.textContent = '未設定'; payCount.textContent = ''; }
+
     // show saved values in inputs as placeholder
-    if (billDay) document.getElementById('billDayInput').placeholder = `目前：${billDay} 號`;
-    if (payDay) document.getElementById('payDayInput').placeholder = `目前：${payDay} 號`;
+    if (billDayActive) document.getElementById('billDayInput').placeholder = `目前：${billDayActive} 號`;
+    if (payDayActive) document.getElementById('payDayInput').placeholder = `目前：${payDayActive} 號`;
 }
 window.saveBillDay = saveBillDay;
 window.savePayDay = savePayDay;
